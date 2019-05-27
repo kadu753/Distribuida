@@ -84,8 +84,12 @@ def handleData(data):
     elif(data[0] == 1):  # Procurar chave
         if(hash_key in hash):
             to = whereToSend(data[2] * hash_size)
-            data = pickle.dumps(
-                [2, key_received, data[2], hash[hash_key][key_received]])
+            try:
+                data = pickle.dumps(
+                    [2, key_received, data[2], hash[hash_key][key_received]])
+            except:
+                data = pickle.dumps(
+                    [2, key_received, data[2], 'chave não foi registrada ainda'])
         else:
             to = whereToSend(hash_key)
             data = pickle.dumps([data[0], data[1], data[2]])
@@ -101,7 +105,12 @@ def handleData(data):
 
 
 def writeMessage():
-    key = int(input('Qual a chave?\n'))
+    while True:
+        try:
+            key = int(input('Qual a chave?\n'))
+            break
+        except:
+            print('Essa não é uma opção válida. Apenas números são aceitos')
     hash_key = key % (hash_size * numClients)
     message = input('Qual a mensagem?\n')
     sendMessage(hash_key, key, message)
@@ -135,11 +144,19 @@ def whereToSend(hash_key):
 
 
 def findKey():
-    key = int(input('Qual a chave que gostaria de procurar?\n'))
+    while True:
+        try:
+            key = int(input('Qual a chave que gostaria de procurar?\n'))
+            break
+        except:
+            print('Essa não é uma opção válida. Apenas números são aceitos')
     hash_key = key % (hash_size * numClients)
     if(hash_key in hash):
-        print('A mensagem da chave ' + str(key) +
-              ' é ' + str(hash[hash_key][key]))
+        try:
+            print('A mensagem da chave ' + str(key) +
+                  ' é ' + str(hash[hash_key][key]))
+        except:
+            print('Chave não encontrada')
     else:
         data = pickle.dumps([1, key, id])
         to = whereToSend(hash_key)
@@ -175,20 +192,40 @@ def clear():
         _ = system('clear')
 
 
+def printHash():
+    print('\tHash Table\n')
+    for i, items in hash.items():
+        print(i, ':')
+        for j, item in items.items():
+            print('\t', j, ':', item)
+
+
+def printRoutingTable():
+    print('\tTabela de Roteamento\n')
+    print('ID\tMaior Index')
+    for i in routingTable:
+        print(i[0], '\t', i[1])
+
+
 def menu():
     while True:
         clear()
         print(
-            'Opções\n1 - Mandar mensagem\n2 - Procurar chave\n3 - Visualizar Hash\n4 - Mostrar tabela de roteamento\n0 - Sair')
-        option = int(input())
+            '\t\tOpções\n1 - Mandar mensagem\n2 - Procurar chave\n3 - Visualizar Hash\n4 - Mostrar tabela de roteamento\n0 - Sair\n\n')
+        while True:
+            try:
+                option = int(input('Escolha uma opção:\n'))
+                break
+            except:
+                print('Essa não é uma opção válida. Apenas números são aceitos')
         if(option == 1):
             writeMessage()
         elif(option == 2):
             findKey()
         elif(option == 3):
-            print(hash)
+            printHash()
         elif(option == 4):
-            print(routingTable)
+            printRoutingTable()
         elif(option == 0):
             sys.exit()
         else:
