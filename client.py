@@ -24,6 +24,14 @@ hash_size = 2
 hash = {}
 
 
+def createRoutingTable():
+    for i in links:
+        if (id == i[0]):
+            routingTable.append([i[1], i[1] * hash_size + hash_size - 1])
+        elif(id == i[1]):
+            routingTable.append([i[0], i[0] * hash_size + hash_size - 1])
+
+
 class Receiver(threading.Thread):
 
     def __init__(self, my_host, my_port):
@@ -53,8 +61,18 @@ class Receiver(threading.Thread):
         self.listen()
 
 
+def sendData(to, data):
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((servers[to][0], servers[to][1]))
+        s.send(data)
+        s.shutdown(2)
+        s.close()
+    except:
+        print('Falha ao enviar dados')
+
+
 def handleData(data):
-    print(data)
     key_received = data[1]
     hash_key = key_received % (hash_size * numClients)
     if(data[0] == 0):  # Adicionar chave
@@ -65,27 +83,26 @@ def handleData(data):
             sendMessage(hash_key, key_received, message_received)
     elif(data[0] == 1):  # Procurar chave
         if(hash_key in hash):
-            to = data[2]
+            to = whereToSend(data[2] * hash_size)
             data = pickle.dumps(
-                [2, key_received, hash[hash_key][key_received]])
+                [2, key_received, data[2], hash[hash_key][key_received]])
         else:
             to = whereToSend(hash_key)
             data = pickle.dumps([data[0], data[1], data[2]])
-        print(to)
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((servers[to][0], servers[to][1]))
-        s.send(data)
-        s.shutdown(2)
-        s.close()
-    elif(data[0] == 2):  # Mostrar chave
-        print('A mensagem da chave ' +
-              str(key_received) + ' é ' + str(data[2]))
+        sendData(to, data)
+    elif(data[0] == 2):  # Devolver e mostrar chave
+        if(id == data[2]):
+            print('A mensagem da chave ' +
+                  str(key_received) + ' é ' + str(data[3]))
+        else:
+            to = whereToSend(data[2] * hash_size)
+            data = pickle.dumps([2, data[1], data[2], data[3]])
+            sendData(to, data)
 
 
 def writeMessage():
     key = int(input('Qual a chave?\n'))
     hash_key = key % (hash_size * numClients)
-    print(hash_key)
     message = input('Qual a mensagem?\n')
     sendMessage(hash_key, key, message)
 
@@ -95,14 +112,9 @@ def sendMessage(hash_key, key, message):
         hash[hash_key][key] = message
     else:
         to = whereToSend(hash_key)
-        print('Enviando para ' + str(to))
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((servers[to][0], servers[to][1]))
             data = pickle.dumps([0, key, message])
-            s.send(data)
-            s.shutdown(2)
-            s.close()
+            sendData(to, data)
         except:
             print('Falha ao enviar mensagem')
 
@@ -111,32 +123,15 @@ def whereToSend(hash_key):
     aux_num = 123456789
     aux_id = -1
     for i in routingTable:
-        print('Index: ' + str(i[1]) + '\nAux_num: ' +
-              str(aux_num) + '\nHash_key: ' + str(hash_key))
         if (i[1] < aux_num and hash_key <= i[1]):
-            print('Entrou no if')
-            print(i[0])
             aux_num = i[1]
             aux_id = i[0]
     if(aux_id == -1):
         for i in routingTable:
-            print('Index: ' + str(i[1]) + '\nAux_num: ' +
-                str(aux_num) + '\nHash_key: ' + str(hash_key))
             if (i[1] < aux_num and hash_key >= i[1]):
-                print('Entrou no if')
-                print(i[0])
                 aux_num = i[1]
                 aux_id = i[0]
-    print('Mandando a mensagem para ' + str(aux_id))
     return aux_id
-
-
-def createRoutingTable():
-    for i in links:
-        if (id == i[0]):
-            routingTable.append([i[1], i[1] * hash_size + hash_size - 1])
-        elif(id == i[1]):
-            routingTable.append([i[0], i[0] * hash_size + hash_size - 1])
 
 
 def findKey():
@@ -149,11 +144,7 @@ def findKey():
         data = pickle.dumps([1, key, id])
         to = whereToSend(hash_key)
         try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.connect((servers[to][0], servers[to][1]))
-            s.send(data)
-            s.shutdown(2)
-            s.close()
+            sendData(to, data)
         except:
             print('Falha ao enviar mensagem\n')
 
@@ -168,7 +159,6 @@ def main():
         print('Falta argumentos')
         sys.exit()
     createRoutingTable()
-    print(routingTable)
     receiver = Receiver(my_host, my_port)
     receiver.daemon = True
     receiver.start()
@@ -187,6 +177,7 @@ def clear():
 
 def menu():
     while True:
+        clear()
         print(
             'Opções\n1 - Mandar mensagem\n2 - Procurar chave\n3 - Visualizar Hash\n4 - Mostrar tabela de roteamento\n0 - Sair')
         option = int(input())
